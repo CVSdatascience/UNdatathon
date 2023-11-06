@@ -1,0 +1,471 @@
+---
+title: "<span style='color: #3B7A8C; font-weight: bold; font-size: 65px; font-family: Arial;'>Transitioning to Open-Access<br>Education</span>"
+title-slide-attributes:
+  data-background-image: "un_datathon_background.png"
+  data-background-size: contain
+  data-background-opacity: "1"
+  margin: 1
+author: "<span style='color: #7DCE62; font-weight: bold; font-family: Arial;font-size: 30px;'>2023 UN Datathon<br>Team Sustainably MAEDE<br>November 2023</span>"
+format:
+  revealjs:
+    embed-resources: true
+editor: visual
+editor_options: 
+  chunk_output_type: console
+  toccolor: "<span> #0D93D2 </span>"
+---
+
+## SDG 4: Ensure inclusive and equitable quality education and promote lifelong learning opportunities for all {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+-   According to the Sustainable Development Goals (SDGs) Education is a right
+-   However, barriers to education persist (monetary costs, personal resources such as time, geographic barriers, social issues outside of personal control, available non-user-friendly format of education materials)
+-   Given these potential issues and barriers, what can be done to achieve goal 4?
+
+## Open-access Educational Resources for All {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+**Goals of Sustainably MAEDE solution:**
+
+-   Provide free quality education to all
+
+-   Overcome barriers (location, time, language) to accessing educational resources (materials, lessons, curricula)
+
+-   Ensure fully inclusive educational environment (genderless, ageless)
+
+-   Support primary and secondary school completion
+
+-   Leverage innovative technologies to reach remote and vulnerable populations
+
+## What does our solution address? {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+-   **SDG 4.1** By 2030, ensure that all girls and boys [complete free, equitable and quality primary and secondary education]{.underline} leading to relevant and effective learning outcomes
+
+-   **SDG 4.1.2** [Completion rate]{.underline} (primary education, lower secondary education, upper secondary education)
+
+-   **SDG 4.5** By 2030, [eliminate]{.underline} gender [disparities in education and ensure equal access]{.underline} to all levels of education and vocational training for the vulnerable, including persons with disabilities, indigenous peoples and children in vulnerable situations
+
+-   **SDG 4.6** By 2030, [ensure that all youth]{.underline} and a substantial proportion of adults, both men and women, [achieve literacy and numeracy]{.underline}
+
+-   **SDG 4a** Build and [upgrade education facilities]{.underline} that are child, disability and gender sensitive and provide safe, non-violent, inclusive and effective learning environments for all
+
+## Methodology {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+-   Understand links between Education and socio-economic outcomes
+    -   Comparative country-level analysis (UNESCO data)
+-   Localize SDG Education indicators utilizing geospatial data
+    -   Canada example (2021 Canadian Census; Statistics Canada)
+-   Provide innovative solution to address SDG objectives
+    -   Live mobile app prototype presentation
+
+## Data Sources and Variables {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+-   We located social and economic demographic variables from the UNESCO Institute for Statistics. These variables include:
+    -   Completion rate, upper secondary education, both sexes (%)
+    -   Life expectancy at birth, total (years)
+    -   GDP per capita (current US\$)
+    -   Poverty headcount ratio at \$3.20 a day (PPP) (% of population)
+
+## Poverty Rate & Education (2020) {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+```{r, message=FALSE}
+library(tidyverse)
+library(janitor)
+library(plotly)
+
+citation_df_1 <- "http://data.uis.unesco.org/index.aspx?queryid=3694"
+citation_df_2 <- "http://sdg4-data.uis.unesco.org/"
+
+unesco_data <- 
+  full_join(
+  (read.csv("~diego/4. Misc/5. Datathon/Data Sets/DEMO_DS_05112023164247783.csv") %>%
+     dplyr::filter(Indicator == "Life expectancy at birth, total (years)" | Indicator == "GDP per capita, PPP (current international $)" | Indicator == "Poverty headcount ratio at $3.20 a day (PPP) (% of population)") %>%  
+     dplyr::select(Indicator, Value, Time, Country, LOCATION) %>%
+     pivot_wider(names_from = Indicator,
+                 values_from = Value,
+                 values_fill = NA) %>%
+     janitor::clean_names() %>%
+     dplyr::rename(year = time, life_exp = 4, gdppc = 5, poverty = 6)),
+  (read.csv("~diego/4. Misc/5. Datathon/Data Sets/SDG_Sept2023_.csv") %>% 
+     dplyr::filter(Indicator.Name == "Completion rate, primary education, both sexes (%)" | Indicator.Name == "Completion rate, upper secondary education, both sexes (%)") %>%
+     pivot_wider(names_from = Indicator.Name, 
+                 values_from = Value) %>%
+     janitor::clean_names() %>% 
+     dplyr::rename(primary_edu = 7, 
+                   secondary_edu = 8) %>%
+     dplyr::select(country, year, 7:8)),
+  by = c("country", "year"))
+  
+```
+
+```{r}
+library(tidymodels)
+
+model_1_data <- unesco_data %>%
+  dplyr::filter(year == 2020) %>%
+  drop_na(poverty, secondary_edu) %>%
+  dplyr::select(year, country, poverty, secondary_edu)
+
+y_1 <- model_1_data$poverty
+X_1 <- model_1_data$secondary_edu 
+
+lm_model_1 <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression") %>%
+  fit(poverty ~ secondary_edu, data = model_1_data)
+
+x_range_1 <- seq(min(X_1), max(X_1), length.out = 100)
+x_range_1 <- matrix(x_range_1, nrow=100, ncol=1)
+xdf_1 <- data.frame(x_range_1)
+colnames(xdf_1) <- c('secondary_edu')
+
+ydf_1 <- lm_model_1 %>%
+  predict(xdf_1)
+
+colnames(ydf_1) <- c('poverty')
+xy_1 <- data.frame(xdf_1, ydf_1) %>%
+  dplyr::mutate(
+    secondary_edu = round(secondary_edu, 2),
+    poverty = round(poverty, 2))
+
+unesco_data %>% 
+  dplyr::filter(year == 2020) %>%
+  plot_ly(x = ~secondary_edu, 
+          y = ~poverty,
+          type = "scatter",
+          alpha = 0.65,
+          mode = "markers",
+       #   text = ~country,
+         hovertemplate = paste(
+           # "<b>%{text}</b><br>",
+            '<b>Coefficient:</b> -0.28<br>',
+            '<b>R<sup>2</sup></b>: 0.18<br>',
+            '<b>P-Value</b>: 0.0052<br>',
+            '<b>Poverty Rate (%)</b>: %{y:.1f}',
+            '<br><b>Secondary Education (%)</b>: %{x}<br>',
+            '</b><extra></extra>'),
+          width = 1050, height = 500) %>%
+  layout(xaxis = list(title = "Secondary Education Completion (%)"),
+         yaxis = list(title = "Poverty Rate (%)"),
+                      showlegend = FALSE) %>% 
+  add_trace(data = xy_1, 
+            x = ~secondary_edu, 
+            y = ~poverty, 
+            name = "",
+            mode = "lines",
+            alpha = 1)
+```
+
+## GDP Per Capita & Education (2020) {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+```{r}
+library(tidymodels)
+
+model_2_data <- unesco_data %>%
+  dplyr::filter(year == 2020) %>%
+  drop_na(gdppc, secondary_edu) %>%
+  dplyr::select(year, country, gdppc, secondary_edu)
+
+y_2 <- model_2_data$gdppc
+X_2 <- model_2_data$secondary_edu 
+
+lm_model_2 <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression") %>%
+  fit(gdppc ~ secondary_edu, data = model_2_data)
+
+x_range_2 <- seq(min(X_2), max(X_2), length.out = 100)
+x_range_2 <- matrix(x_range_2, nrow=100, ncol=1)
+xdf_2 <- data.frame(x_range_2)
+colnames(xdf_2) <- c('secondary_edu')
+
+ydf_2 <- lm_model_2%>%
+  predict(xdf_2)
+
+colnames(ydf_2) <- c('gdppc')
+xy_2 <- data.frame(xdf_2, ydf_2) %>%
+  dplyr::mutate(
+    secondary_edu = round(secondary_edu, 2),
+    gdppc = round(gdppc, 2))
+
+unesco_data %>% 
+  dplyr::filter(year == 2020) %>%
+  plot_ly(x = ~secondary_edu, 
+          y = ~gdppc,
+          type = "scatter",
+          alpha = 0.65,
+          mode = "markers",
+       #   text = ~country,
+         hovertemplate = paste(
+           # "<b>%{text}</b><br>",
+            '<b>Coefficient</b>: 406.61<br>',
+            '<b>R<sup>2</sup></b>:  0.39<br>',
+            '<b>P-Value</b>:= 1.42<sup>-14</sup><br>',
+            '<b>GDP Per Capita</b>: %{y:.1f}',
+            '<br><b>Secondary Education (%)</b>: %{x}<br>',
+            '</b><extra></extra>'),
+          width = 1050, height = 500) %>%
+  layout(xaxis = list(title = "Secondary Education Completion (%)"),
+         yaxis = list(title = "GDP Per Capita"),
+         showlegend = FALSE) %>% 
+  add_trace(data = xy_2, 
+            x = ~secondary_edu, 
+            y = ~gdppc, 
+            name = "",
+            mode = "lines",
+            alpha = 1)
+```
+
+## Life Expectancy & Education (2020) {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+```{r}
+library(tidymodels)
+
+model_3_data <- unesco_data %>%
+  dplyr::filter(year == 2020) %>%
+  drop_na(life_exp, secondary_edu) %>%
+  dplyr::select(year, country, life_exp, secondary_edu)
+
+y_3 <- model_2_data$life_exp
+X_3 <- model_2_data$secondary_edu 
+
+lm_model_3 <- linear_reg() %>%
+  set_engine("lm") %>%
+  set_mode("regression") %>%
+  fit(life_exp ~ secondary_edu, data = model_3_data)
+
+x_range_3 <- seq(min(X_3), max(X_3), length.out = 100)
+x_range_3 <- matrix(x_range_3, nrow=100, ncol=1)
+xdf_3 <- data.frame(x_range_3)
+colnames(xdf_3) <- c('secondary_edu')
+
+ydf_3 <- lm_model_3 %>%
+  predict(xdf_3)
+
+colnames(ydf_3) <- c('life_exp')
+xy_3 <- data.frame(xdf_3, ydf_3) %>%
+  dplyr::mutate(
+    secondary_edu = round(secondary_edu, 2),
+    life_exp = round(life_exp, 2))
+
+unesco_data %>% 
+  dplyr::filter(year == 2020) %>%
+  plot_ly(x = ~secondary_edu, 
+          y = ~life_exp,
+          type = "scatter",
+          hoverinfo = 'y',
+          alpha = 0.65,
+          mode = "markers",
+       #   text = ~country,
+         hovertemplate = paste(
+           # "<b>%{text}</b><br>",
+            '<b>Coefficient</b>: 0.18<br>',
+            '<b>R<sup>2</sup></b>:  0.54<br>',
+            '<b>P-Value</b>:= <2<sup>-16</sup><br>',
+            '<b>Life Expectancy</b>: %{y:.1f}',
+            '<br><b>Secondary Education (%)</b>: %{x}<br>',
+            '</b><extra></extra>'),
+          width = 1050, height = 500) %>%
+  layout(xaxis = list(title = "Secondary Education Completion (%)"),
+         yaxis = list(title = "Life Expectancy from Birth (Years)"),
+         showlegend = FALSE) %>%
+  add_trace(data = xy_3, 
+            x = ~secondary_edu, 
+            y = ~life_exp, 
+            name = "",
+            mode = "lines",
+            alpha = 1)
+
+```
+
+## Canadian Case Study {.smaller transition="fade" background-image="un_datathon_background.png" background-size="contain"}
+
+```{r echo=F, results='asis', message=F, warning=F}
+#libraries
+library(readxl)
+library(leaflet)
+library(leaflet.extras)
+library(htmltools)
+library(leaflet.extras2)
+library(readr)
+library(cancensus)
+library(viridis)
+library(sf)
+```
+
+```{r}
+###### UN Datathon Maps  #######
+
+####CANADA - PROVINCES
+
+pr <- sf::read_sf("~diego/4. Misc/5. Datathon/Shape Files/pr/pr.shp")
+
+#calculate no diploma proportion
+pr$nodip_per<-round((pr$nodiplm/pr$Popultn)*100, digits = 2)
+
+#set bins
+bins <- c(0,5,10,15,20,25, Inf)
+
+#set colour palette
+palp <- colorBin("viridis", domain = pr$nodip_per, bins = bins,na.color = "#FFFFFF")
+
+#labels
+labelp<- sprintf("Province: <strong>%s</strong> 
+                <br/>No Secondary Diploma or equivalency: <strong>%s%%</strong>", 
+                 pr$name,pr$nodip_per) %>% 
+  lapply(htmltools::HTML)
+
+# sf-class data frame
+cd <- sf::read_sf("~diego/4. Misc/5. Datathon/Shape Files/cd/cd.shp")
+
+library(rmapshaper)
+cd<- ms_simplify(cd, keep = 0.01,keep_shapes = FALSE)
+
+#calculate no diploma proportion
+cd$nodip_per<-round((cd$nodiplm/cd$Popultn)*100, digits = 2)
+
+
+#set colour palette
+pal <- colorBin("viridis", domain = cd$nodip_per, bins = bins)
+
+#labels
+label<- sprintf("Census Division: <strong>%s</strong> 
+                <br/>No Secondary Diploma or equivalency: <strong>%s%%</strong>", 
+                cd$name,cd$nodip_per) %>% 
+  lapply(htmltools::HTML)
+```
+
+```{r echo=F, results='asis', message=F, warning=F}
+####BRITISH COLUMBIA - CENSUS SUBDIVIONS
+
+# sf-class data frame
+ca <- sf::read_sf("~diego/4. Misc/5. Datathon/Shape Files/ca/ca.shp") 
+
+#calculate no diploma proportion
+ca$nodip_per<-round((ca$nodiplm/ca$Popultn)*100, digits = 2)
+
+#palette
+palc <- colorBin("viridis", domain = ca$nodip_per, bins = bins,na.color = "#FFFFFF")
+
+#labels
+labelc<- sprintf("Census Subdivision: <strong>%s</strong> 
+                <br/>No Secondary Diploma or equivalency: <strong>%s%%</strong>", 
+                 ca$name,ca$nodip_per) %>% 
+  lapply(htmltools::HTML)
+
+```
+
+```{r echo=F, results='asis', message=F, warning=F}
+####SURREY, BC, CANADA - DISSEMINATION AREAS
+
+# sf-class data frame
+bn <- sf::read_sf("~diego/4. Misc/5. Datathon/Shape Files/bn/bn.shp")
+
+bn<- ms_simplify(bn, keep = 0.01,keep_shapes = FALSE)
+
+#calculate no diploma proportion
+bn$nodip_per<-round((bn$nodiplm/bn$Popultn)*100, digits = 2)
+
+#palette
+palb <- colorBin("viridis", domain = bn$nodip_per, bins = bins,na.color = "#FFFFFF")
+
+#labels
+labelb<- sprintf("Dissemination Area: <strong>%s</strong> 
+                <br/>No Secondary Diploma or equivalency: <strong>%s%%</strong>", 
+                 bn$name,bn$nodip_per) %>% 
+  lapply(htmltools::HTML)
+```
+
+```{r}
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(-98.3, 57.5, 4) %>% 
+  addResetMapButton()%>%
+  addControl("<strong>Data Source</strong>: Statistics Canada;<br/>
+  2021 Canadian Census; cancensus R pkg<br/>
+<strong>Variable</strong>: 25% Data;
+              Adults aged 25-64;<br/> 
+             No High School Diploma or equivalency", 
+             position = "bottomleft")%>%
+  addPolygons(data = pr, fillColor = ~palp(nodip_per),
+              color = "black",
+              weight = 0.5,
+              opacity = 1,
+              group = "Provincial",
+              fillOpacity = 0.9,label = labelp,
+              highlightOptions = highlightOptions(
+                weight = 2,
+                fillOpacity = 0.8,
+                color = "white",
+                bringToFront = TRUE),
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+  addPolygons(data = cd, fillColor = ~pal(nodip_per),
+              color = "black",
+              weight = 0.5,
+              opacity = 1,
+              group = "Census Division",
+              fillOpacity = 0.9,label = label,
+              highlightOptions = highlightOptions(
+                weight = 2,
+                fillOpacity = 0.8,
+                color = "white",
+                bringToFront = TRUE),
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  addPolygons(data = ca, fillColor = ~palc(nodip_per),
+              color = "black",
+              weight = 0.5,
+              opacity = 1,
+              group = "British Columbia",
+              fillOpacity = 0.9,label = labelc,
+              highlightOptions = highlightOptions(
+                weight = 2,
+                fillOpacity = 0.8,
+                color = "white",
+                bringToFront = TRUE),
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  addPolygons(data = bn, fillColor = ~palb(nodip_per),
+              color = "black",
+              weight = 0.5,
+              opacity = 1,
+              group = "Surrey, BC",
+              fillOpacity = 0.9,label = labelb,
+              highlightOptions = highlightOptions(
+                weight = 2,
+                fillOpacity = 0.8,
+                color = "white",
+                bringToFront = TRUE),
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  addLegend(pal = palp, values = pr$nodip_per, opacity = 0.7, 
+            title = "No Secondary<br/>Diploma",
+            position = "topright", na.label = "", labFormat = labelFormat(suffix = "%"))%>%
+  addLayersControl(baseGroups = c("Provincial", "Census Division",
+                                  "British Columbia", "Surrey, BC"),
+  options = layersControlOptions(collapsed = FALSE))
+```
+
+## Appendix: Examples of available education resources
+
+-   British Columbia, Canada education curriculum https://curriculum.gov.bc.ca/curriculum/adst Burnaby, BC Canada. Online learning resources for primary and secondary education
+-   https://www2.gov.bc.ca/gov/content/education-training/k-12/support/classroom-alternatives/online-learning/how-to-enrol
+-   Estado Plurinacional de Bolivia, Education Ministry. Available education resource materials https://red.minedu.gob.bo/documento/recurso/7376
+
+## Sustainably MAEDE Team
+
+* Marcus Macauley
+* Alejandro Casazi
+* Elsa Macauley
+* Diego Vasquez
+* Evan Petka
+
+
+
