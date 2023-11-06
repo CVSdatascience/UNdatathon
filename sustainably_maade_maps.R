@@ -12,7 +12,8 @@ library(cancensus)
 library(viridis)
 
 #set options
-options(cancensus.api_key = "INSERT API KEY") #api key
+options(cancensus.api_key = "INSERT API KEY") 
+#api key -- see https://cran.r-project.org/web/packages/cancensus/vignettes/cancensus.html for information
 
 #set cache path
 options(cancensus.cache_path = "INSERT DIRECTORY PATH")
